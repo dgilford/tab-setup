@@ -17,10 +17,9 @@ TAB_NAME="${2:-$(basename "$PWD")}"
 RESULT=$(python3 - "$TRACKING_FILE" "$SESSION_ID" "$SESSIONS_DIR" "$PWD" "$TAB_NAME" <<'PYEOF'
 import json, sys, os, glob
 
-# Greedy farthest-point sequence using Claude Code banner color names.
-# Each step maximises perceptual distance from prior picks.
-# "red" replaced with "crimson" (Claude Code doesn't recognise "red").
-SEQUENCE = ["crimson", "blue", "green", "pink", "purple", "cyan", "yellow", "orange"]
+# Greedy farthest-point sequence using /color command valid names.
+# Valid: red, blue, green, yellow, purple, orange, pink, cyan, default
+SEQUENCE = ["red", "blue", "green", "pink", "purple", "cyan", "yellow", "orange"]
 
 tracking_file, session_id, sessions_dir, cwd, name = sys.argv[1:]
 
@@ -45,9 +44,11 @@ except Exception:
     tracking = {}
 
 # Remove stale entry for this session, prune dead PIDs
-tracking.pop(session_id, None)
+# Prune dead sessions, collect live colors (excluding this session)
 live, used_colors = {}, set()
 for sid, entry in tracking.items():
+    if sid == session_id:
+        continue
     try:
         os.kill(entry.get("pid", 0), 0)
         live[sid] = entry
@@ -55,10 +56,21 @@ for sid, entry in tracking.items():
     except (OSError, ProcessLookupError):
         pass
 
-# Claim the earliest sequence slot not already in use
-chosen = next((c for c in SEQUENCE if c not in used_colors), SEQUENCE[0])
+# Rotate from last used color so each /tab-setup invocation picks the next slot,
+# even within the same session (single-session users always got slot 0 before).
+last_color = tracking.get(session_id, {}).get("color") or tracking.get("_last", "")
+try:
+    start = (SEQUENCE.index(last_color) + 1) % len(SEQUENCE)
+except ValueError:
+    start = 0
+chosen = next(
+    (SEQUENCE[(start + i) % len(SEQUENCE)] for i in range(len(SEQUENCE))
+     if SEQUENCE[(start + i) % len(SEQUENCE)] not in used_colors),
+    SEQUENCE[start]
+)
 
 live[session_id] = {"color": chosen, "pid": claude_pid, "cwd": cwd, "name": name}
+live["_last"] = chosen  # global rotation cursor
 with open(tracking_file, "w") as f:
     json.dump(live, f, indent=2)
 
