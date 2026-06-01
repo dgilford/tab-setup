@@ -84,5 +84,10 @@ fi
 
 eval "$RESULT"
 
+# Write pending-color file for the Cursor/VS Code extension to pick up.
+# The extension watches this file, waits for the session to go idle,
+# then calls sendText('/color ...') and sendText('/rename ...') automatically.
+PENDING_FILE="${HOME}/.claude/.pending-color"
+printf 'session_id=%s\ncolor=%s\nname=%s\n' "$SESSION_ID" "$CHOSEN_COLOR" "$TAB_NAME" > "$PENDING_FILE"
 
 echo "color=${CHOSEN_COLOR} name=${TAB_NAME}"
