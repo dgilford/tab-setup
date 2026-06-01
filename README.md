@@ -64,7 +64,7 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-The script discovers the session by matching `/dev/tty` against live session files (working around the `CLAUDE_SESSION_ID=''` limitation in `SessionStart` hooks), then dispatches to the correct injection mechanism based on the detected environment.
+The script works around the `CLAUDE_SESSION_ID=''` limitation in `SessionStart` hooks by walking the PPID chain (hook → shell → claude) to identify the Claude process, then dispatches to the correct injection mechanism based on the detected environment. No `/dev/tty` access required — works in code-server and JupyterHub too.
 
 Tune the delay if `/color` fires before Claude's first prompt is ready:
 
