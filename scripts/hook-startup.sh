@@ -26,7 +26,7 @@ INJECT_DELAY="${TAB_SETUP_INJECT_DELAY:-4}"
 [[ ! -f "$TRACKING_FILE" ]] && echo '{}' > "$TRACKING_FILE"
 
 python3 - "$TRACKING_FILE" "$SESSIONS_DIR" "$SCRIPTS_DIR" "$INJECT_DELAY" <<'PYEOF'
-import glob, json, os, subprocess, sys, time
+import glob, json, os, shlex, subprocess, sys, time
 
 SEQUENCE = ["red", "blue", "green", "pink", "purple", "cyan", "yellow", "orange"]
 COLORS = {
@@ -172,7 +172,7 @@ if in_iterm2:
 end run
 """)
     subprocess.Popen(
-        ["nohup", "osascript", ascript_path, tty_dev, name, chosen],
+        ["nohup", "osascript", ascript_path, tty_dev, name, chosen],  # Popen handles quoting
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True,
     )

@@ -18,7 +18,7 @@ SESSIONS_DIR="${HOME}/.claude/sessions"
 TAB_NAME="${2:-$(basename "$PWD")}"
 
 RESULT=$(python3 - "$TRACKING_FILE" "$SESSION_ID" "$SESSIONS_DIR" "$PWD" "$TAB_NAME" <<'PYEOF'
-import json, sys, os, glob
+import json, sys, os, glob, shlex
 
 SEQUENCE = ["red", "blue", "green", "pink", "purple", "cyan", "yellow", "orange"]
 COLORS = {
@@ -103,7 +103,7 @@ print(f"CHOSEN_COLOR={chosen}")
 print(f"TAB_R={r}")
 print(f"TAB_G={g}")
 print(f"TAB_B={b}")
-print(f"TAB_NAME={name}")
+print(f"TAB_NAME={shlex.quote(name)}")
 print(f"CLAUDE_PID={claude_pid}")
 PYEOF
 )
@@ -124,30 +124,44 @@ if [[ "$TERM_PROGRAM" == "iTerm.app" ]]; then
             printf '\033]6;1;bg;blue;brightness;%d\a'  "$TAB_B"
         } > "/dev/$CLAUDE_TTY"
 
-        osascript - "/dev/$CLAUDE_TTY" "$TAB_NAME" "$CHOSEN_COLOR" <<'ASEOF' &
-on run argv
-  set ttyDevice to item 1 of argv
-  set tabName to item 2 of argv
-  set tabColor to item 3 of argv
-  delay 4
-  try
-    tell application "iTerm2"
-      repeat with w in windows
-        repeat with t in tabs of w
-          repeat with s in sessions of t
-            if tty of s = ttyDevice then
-              tell s to write text "/color " & tabColor
-              delay 0.3
-              tell s to write text "/rename " & tabName
-              return
-            end if
-          end repeat
-        end repeat
+        # Poll the session JSON until Claude is no longer busy, then inject.
+        # Fixed delays race against Claude's response rendering; polling is exact.
+        (
+            SESSION_JSON=$(python3 -c "
+import glob, json, os, sys
+for f in glob.glob('${SESSIONS_DIR}/*.json'):
+    try:
+        d = json.load(open(f))
+        if d.get('sessionId') == '${SESSION_ID}':
+            print(f); sys.exit(0)
+    except: pass
+" 2>/dev/null)
+            if [[ -n "$SESSION_JSON" ]]; then
+                for _ in $(seq 1 60); do
+                    STATUS=$(python3 -c "import json; print(json.load(open('$SESSION_JSON')).get('status',''))" 2>/dev/null)
+                    [[ "$STATUS" != "busy" ]] && break
+                    sleep 0.5
+                done
+                sleep 0.3
+            else
+                sleep 5
+            fi
+            osascript -e "
+tell application \"iTerm2\"
+  repeat with w in windows
+    repeat with t in tabs of w
+      repeat with s in sessions of t
+        if tty of s = \"/dev/${CLAUDE_TTY}\" then
+          tell s to write text \"/color ${CHOSEN_COLOR}\"
+          delay 0.3
+          tell s to write text \"/rename ${TAB_NAME}\"
+          return
+        end if
       end repeat
-    end tell
-  end try
-end run
-ASEOF
+    end repeat
+  end repeat
+end tell"
+        ) &
     else
         echo "warn: no writable TTY for PID $CLAUDE_PID (tty=$CLAUDE_TTY)" >&2
     fi
