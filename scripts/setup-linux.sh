@@ -47,7 +47,7 @@ except Exception:
 # Prune dead sessions, collect live colors (excluding this session)
 live, used_colors = {}, set()
 for sid, entry in tracking.items():
-    if sid == session_id:
+    if sid == session_id or sid == "_last" or not isinstance(entry, dict):
         continue
     try:
         os.kill(entry.get("pid", 0), 0)
