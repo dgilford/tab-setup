@@ -12,7 +12,8 @@
 #   }
 #
 # Note: CLAUDE_SESSION_ID is empty in SessionStart hooks (Claude Code limitation).
-# This script discovers the session by matching /dev/tty against live session files.
+# Session discovery walks the PPID chain to find the parent Claude process,
+# then matches its PID against session JSON files — no TTY access required.
 #
 # Tune the inject delay if /color fires before Claude's first prompt:
 #   TAB_SETUP_INJECT_DELAY=6 bash hook-startup.sh
@@ -43,67 +44,42 @@ tracking_file, sessions_dir, scripts_dir, inject_delay = sys.argv[1:]
 inject_delay = int(inject_delay)
 
 
-def get_tty():
-    # /dev/tty = controlling terminal; accessible even when stdio is redirected
-    try:
-        fd = os.open("/dev/tty", os.O_RDONLY | os.O_NOCTTY)
+def find_session_by_ppid(retries=10, delay=0.3):
+    """Walk PPID chain to find the Claude process, match to session JSON."""
+    # Collect ancestor PIDs (hook subprocess → shell → claude)
+    ancestor_pids = set()
+    pid = os.getpid()
+    for _ in range(8):
         try:
-            return os.ttyname(fd)
-        finally:
-            os.close(fd)
-    except OSError:
-        pass
-    for fd in [0, 1, 2]:
-        try:
-            if os.isatty(fd):
-                return os.ttyname(fd)
-        except OSError:
-            pass
-    # Last resort: walk the process tree for an ancestor with a TTY
-    try:
-        pid = os.getpid()
-        for _ in range(6):
-            r = subprocess.run(["ps", "-o", "ppid=,tty=", "-p", str(pid)],
+            r = subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)],
                                capture_output=True, text=True, timeout=2)
             if r.returncode != 0:
                 break
-            parts = r.stdout.strip().split(None, 1)
-            if len(parts) < 2:
+            ppid = int(r.stdout.strip())
+            if ppid <= 1:
                 break
-            ppid, tty = int(parts[0]), parts[1].strip()
-            if tty and tty != "??":
-                return f"/dev/{tty}"
+            ancestor_pids.add(ppid)
             pid = ppid
-    except Exception:
-        pass
-    return None
+        except Exception:
+            break
 
-
-def find_session_by_tty(tty_dev, retries=10, delay=0.3):
-    tty_short = tty_dev.replace("/dev/", "")
     for _ in range(retries):
         for f in glob.glob(os.path.join(sessions_dir, "*.json")):
             try:
                 data = json.load(open(f))
-                pid = data.get("pid")
-                if not pid:
+                session_pid = data.get("pid")
+                if not session_pid:
                     continue
-                os.kill(pid, 0)
-                r = subprocess.run(["ps", "-o", "tty=", "-p", str(pid)],
-                                   capture_output=True, text=True, timeout=2)
-                if r.returncode == 0 and r.stdout.strip() == tty_short:
-                    return pid, data.get("sessionId", ""), data.get("cwd", "")
+                os.kill(session_pid, 0)  # confirm alive
+                if session_pid in ancestor_pids:
+                    return session_pid, data.get("sessionId", ""), data.get("cwd", "")
             except Exception:
                 continue
         time.sleep(delay)
     return None, None, None
 
 
-tty_dev = get_tty()
-if not tty_dev:
-    sys.exit(0)
-
-claude_pid, session_id, cwd = find_session_by_tty(tty_dev)
+claude_pid, session_id, cwd = find_session_by_ppid()
 if not claude_pid:
     sys.exit(0)
 
