@@ -208,15 +208,17 @@ if not session_name:
 # Official Claude Code hook output — sets the session title in the UI
 print(json.dumps({"sessionTitle": session_name}), flush=True)
 
-# Belt-and-suspenders: also write name into the session JSON file
+# Write session name into the session JSON if not already set.
 for f in glob.glob(os.path.join(sessions_dir, "*.json")):
     try:
         data = json.load(open(f))
-        if data.get("sessionId") == session_id and not data.get("name"):
+        if data.get("sessionId") != session_id:
+            continue
+        if not data.get("name"):
             data["name"] = session_name
             with open(f, "w") as wf:
                 json.dump(data, wf)
-            break
+        break
     except Exception:
         pass
 
@@ -241,16 +243,25 @@ for sid, entry in tracking.items():
     except Exception:
         pass
 
-# Reuse existing assignment if this session was already colored
-# (persists color/name through /clear and claude -c)
-existing = tracking.get(session_id)
-if existing and isinstance(existing, dict) and existing.get("color") in SEQUENCE:
-    chosen = existing["color"]
-    name   = existing.get("name") or project_name
-    live[session_id] = {"color": chosen, "pid": claude_pid, "cwd": cwd, "name": name}
-    live["_last"] = chosen
-    with open(tracking_file, "w") as f:
-        json.dump(live, f, indent=2)
+# Persistence lookup via project-colors.json (keyed by cwd, watcher-safe).
+# PID is stored alongside the color to distinguish /clear from claude -c:
+#   /clear    → same cwd, same PID  → reuse regardless of used_colors
+#   claude -c → same cwd, new PID   → reuse only if color not held by another live session
+#   fresh     → no entry or color occupied → rotate
+project_colors_file = os.path.expanduser("~/.claude/project-colors.json")
+try:
+    project_colors = json.load(open(project_colors_file))
+except Exception:
+    project_colors = {}
+
+proj = project_colors.get(cwd, {})
+proj_color = proj.get("color")
+proj_name  = proj.get("name")
+same_process = proj.get("pid") == claude_pid
+
+if proj_color in SEQUENCE and (same_process or proj_color not in used_colors):
+    chosen = proj_color
+    name   = proj_name or project_name
 else:
     # Rotate from last used color; skip colors already held by live sessions
     last_color = tracking.get("_last", "")
@@ -265,10 +276,16 @@ else:
     )
     existing_names = {e.get("name", "") for e in live.values()}
     name = f"{project_name} ({chosen})" if project_name in existing_names else project_name
-    live[session_id] = {"color": chosen, "pid": claude_pid, "cwd": cwd, "name": name}
-    live["_last"] = chosen
-    with open(tracking_file, "w") as f:
-        json.dump(live, f, indent=2)
+
+# Write to both stores; project-colors.json is the durable persistence layer
+live[session_id] = {"color": chosen, "pid": claude_pid, "cwd": cwd, "name": name}
+live["_last"] = chosen
+with open(tracking_file, "w") as f:
+    json.dump(live, f, indent=2)
+
+project_colors[cwd] = {"color": chosen, "name": name, "pid": claude_pid}
+with open(project_colors_file, "w") as f:
+    json.dump(project_colors, f, indent=2)
 
 # Transcript writes — universal, guarded by file existence
 project_hash = cwd.replace("/", "-")
