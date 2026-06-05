@@ -352,14 +352,9 @@ else:
     sys.stderr.write(f"tab-setup: not in iTerm2 or VS Code — run /color {chosen} and /rename {name}\n")
     sys.stderr.flush()
 
-# Watcher cleans up tracking file when the Claude process exits
-watcher_sh = os.path.join(scripts_dir, "watcher.sh")
-if os.path.exists(watcher_sh):
-    subprocess.Popen(
-        ["bash", watcher_sh, str(claude_pid), session_id],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+# Dead sessions are pruned lazily: every reader (setup.sh, hook-startup.sh,
+# sync-all.sh) drops entries whose PID is no longer alive on its next run, so
+# no background watcher is needed to clean up the tracking file.
 
 # ---------------------------------------------------------------------------
 # Startup reminders

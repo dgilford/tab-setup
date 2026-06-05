@@ -172,6 +172,4 @@ else
     echo "note: not in iTerm2 or VS Code — run /color $CHOSEN_COLOR and /rename $TAB_NAME" >&2
 fi
 
-nohup bash "$(dirname "$0")/watcher.sh" "$CLAUDE_PID" "$SESSION_ID" > /dev/null 2>&1 &
-
 echo "color=${CHOSEN_COLOR} name=${TAB_NAME}"
