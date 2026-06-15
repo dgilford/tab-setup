@@ -279,12 +279,10 @@ except Exception:
 
 proj = project_colors.get(cwd, {})
 proj_color = proj.get("color")
-proj_name  = proj.get("name")
 same_process = proj.get("pid") == claude_pid
 
 if proj_color in SEQUENCE and (same_process or proj_color not in used_colors):
     chosen = proj_color
-    name   = proj_name or project_name
 else:
     # Rotate from last used color; skip colors already held by live sessions
     last_color = tracking.get("_last", "")
@@ -297,8 +295,13 @@ else:
          if SEQUENCE[(start + i) % len(SEQUENCE)] not in used_colors),
         SEQUENCE[start]
     )
-    existing_names = {e.get("name", "") for e in live.values()}
-    name = f"{project_name} ({chosen})" if project_name in existing_names else project_name
+
+# Recompute the disambiguation suffix every boot from the CURRENTLY live
+# sessions — never inherit a stale "(color)" label from project-colors.json.
+# The suffix is only added when another live session already holds the plain
+# project name; once that conflict clears, the label drops on the next boot.
+existing_names = {e.get("name", "") for e in live.values()}
+name = f"{project_name} ({chosen})" if project_name in existing_names else project_name
 
 # Write to both stores; project-colors.json is the durable persistence layer
 live[session_id] = {"color": chosen, "pid": claude_pid, "cwd": cwd, "name": name}
