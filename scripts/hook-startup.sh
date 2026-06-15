@@ -231,17 +231,40 @@ try:
 except Exception:
     tracking = {}
 
+# Build the set of genuinely-live Claude PIDs from the authoritative session
+# registry (~/.claude/sessions/<pid>.json, one file per live session). A bare
+# os.kill(pid, 0) only proves *some* process owns that PID, so a recycled PID
+# would make a dead session's tracking entry read as alive — producing spurious
+# name-dedup suffixes like "ai-tools (cyan)". Cross-referencing the registry
+# eliminates that false positive. Fall back to os.kill only if the registry is
+# unavailable (older Claude versions that don't write session files).
+registry_pids = set()
+for f in glob.glob(os.path.join(sessions_dir, "*.json")):
+    try:
+        registry_pids.add(json.load(open(f)).get("pid"))
+    except Exception:
+        pass
+registry_pids.discard(None)
+
+def _is_live(pid):
+    if not pid:
+        return False
+    if registry_pids:
+        return pid in registry_pids
+    try:
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
 # Prune dead sessions; skip _last cursor and malformed entries
 live, used_colors = {}, set()
 for sid, entry in tracking.items():
     if sid == session_id or sid == "_last" or not isinstance(entry, dict):
         continue
-    try:
-        os.kill(entry.get("pid", 0), 0)
+    if _is_live(entry.get("pid", 0)):
         live[sid] = entry
         used_colors.add(entry.get("color", ""))
-    except Exception:
-        pass
 
 # Persistence lookup via project-colors.json (keyed by cwd, watcher-safe).
 # PID is stored alongside the color to distinguish /clear from claude -c:
