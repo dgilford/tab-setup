@@ -33,6 +33,19 @@ cp -r tab-setup ~/.claude/skills/tab-setup
 chmod +x ~/.claude/skills/tab-setup/scripts/*.sh
 ```
 
+### Updating
+
+Claude runs the skill from `~/.claude/skills/tab-setup`, **not** from this repo, so
+pulling changes (or merging a PR) does not update the copy Claude executes. After any
+`git pull`, re-sync the installed copy:
+
+```bash
+bash scripts/install.sh
+```
+
+It copies the skill files into place, verifies the installed scripts match the repo,
+and warns if anything is still stale. Changes take effect on the **next** Claude session.
+
 **VS Code / code-server only** — install the companion extension once:
 
 ```bash
