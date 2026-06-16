@@ -353,9 +353,13 @@ if in_iterm2 and tty_dev:
         repeat with t in tabs of w
           repeat with s in sessions of t
             if tty of s = ttyDevice then
-              tell s to write text "/color " & tabColor
+              -- Prepend Ctrl-U (kill-line) so anything the user has typed into
+              -- the prompt is cleared before the command is entered. Without
+              -- this, write text appends to the input buffer and the typed text
+              -- merges into "/color"/"/rename", corrupting both.
+              tell s to write text ((character id 21) & "/color " & tabColor)
               delay 0.3
-              tell s to write text "/rename " & tabName
+              tell s to write text ((character id 21) & "/rename " & tabName)
               return
             end if
           end repeat
