@@ -152,9 +152,9 @@ tell application \"iTerm2\"
     repeat with t in tabs of w
       repeat with s in sessions of t
         if tty of s = \"/dev/${CLAUDE_TTY}\" then
-          tell s to write text ((character id 21) & \"/color ${CHOSEN_COLOR}\")
+          tell s to write text ((character id 5) & (character id 21) & \"/color ${CHOSEN_COLOR}\")
           delay 0.3
-          tell s to write text ((character id 21) & \"/rename ${TAB_NAME}\")
+          tell s to write text ((character id 5) & (character id 21) & \"/rename ${TAB_NAME}\")
           return
         end if
       end repeat

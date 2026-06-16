@@ -353,13 +353,17 @@ if in_iterm2 and tty_dev:
         repeat with t in tabs of w
           repeat with s in sessions of t
             if tty of s = ttyDevice then
-              -- Prepend Ctrl-U (kill-line) so anything the user has typed into
-              -- the prompt is cleared before the command is entered. Without
-              -- this, write text appends to the input buffer and the typed text
-              -- merges into "/color"/"/rename", corrupting both.
-              tell s to write text ((character id 21) & "/color " & tabColor)
+              -- Prepend Ctrl-E then Ctrl-U so anything the user has typed into
+              -- the prompt is cleared before the command is entered. Ctrl-E
+              -- moves to end-of-line and Ctrl-U kills to start, so the whole
+              -- line is cleared regardless of cursor position. Without this,
+              -- write text appends to the input buffer and the typed text merges
+              -- into "/color"/"/rename", corrupting both. (These are Claude
+              -- Code's own readline bindings, so they behave identically across
+              -- terminals.)
+              tell s to write text ((character id 5) & (character id 21) & "/color " & tabColor)
               delay 0.3
-              tell s to write text ((character id 21) & "/rename " & tabName)
+              tell s to write text ((character id 5) & (character id 21) & "/rename " & tabName)
               return
             end if
           end repeat
