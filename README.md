@@ -45,21 +45,24 @@ bash scripts/install.sh
 
 It copies the skill files into place, verifies the installed scripts match the repo,
 and warns if anything is still stale. Changes take effect on the **next** Claude session.
+When a VS Code-family server (VS Code, code-server, or Cursor) is detected, it also
+(re)installs the companion extension automatically — **reload the window** to activate it.
 
 Once installed, you can also update from inside Claude — `install.sh` records the repo
-location, so this pulls the latest and re-installs in one step:
+location, so this pulls the latest and re-installs (extension included) in one step:
 
 ```
 /tab-setup update
 ```
 
-**VS Code / code-server only** — install the companion extension once:
+**VS Code / code-server** — `install.sh` installs the companion extension for you. To
+install it on its own (or if you skipped `install.sh`):
 
 ```bash
 bash ~/.claude/skills/tab-setup/vscode-extension/install.sh
 ```
 
-Then reload the VS Code window.
+Either way, reload the VS Code window to activate it.
 
 ## Usage
 
