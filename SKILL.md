@@ -5,6 +5,16 @@ argument-hint: "[all | optional tab name override]"
 allowed-tools: Bash(bash ~/.claude/skills/tab-setup/scripts/*)
 ---
 
+If `$ARGUMENTS` is `update`, pull the latest skill from its repo and re-install it:
+
+```bash
+bash ~/.claude/skills/tab-setup/scripts/update.sh
+```
+
+Report whether it updated (and from/to which commit) or was already current. Note that changes take effect on the next Claude session.
+
+---
+
 If `$ARGUMENTS` is `all`, run the bulk sync:
 
 ```bash

@@ -24,8 +24,13 @@ cp "$REPO_DIR/scripts/hook-startup.sh" "$DEST/scripts/hook-startup.sh"
 cp "$REPO_DIR/scripts/setup.sh"        "$DEST/scripts/setup.sh"
 cp "$REPO_DIR/scripts/sync-all.sh"     "$DEST/scripts/sync-all.sh"
 cp "$REPO_DIR/scripts/install.sh"      "$DEST/scripts/install.sh"
+cp "$REPO_DIR/scripts/update.sh"       "$DEST/scripts/update.sh"
 
 chmod +x "$DEST/scripts/"*.sh
+
+# Record where this repo lives so `update.sh` knows what to git-pull.
+# Written to the skill root (not scripts/) so it doesn't break the verify diff.
+printf '%s\n' "$REPO_DIR" > "$DEST/.repo-path"
 
 # Verify the installed scripts match the repo so a silent stale copy can't linger.
 if diff -rq "$REPO_DIR/scripts" "$DEST/scripts" >/dev/null; then

@@ -46,6 +46,13 @@ bash scripts/install.sh
 It copies the skill files into place, verifies the installed scripts match the repo,
 and warns if anything is still stale. Changes take effect on the **next** Claude session.
 
+Once installed, you can also update from inside Claude — `install.sh` records the repo
+location, so this pulls the latest and re-installs in one step:
+
+```
+/tab-setup update
+```
+
 **VS Code / code-server only** — install the companion extension once:
 
 ```bash
